@@ -5,6 +5,7 @@ Usage examples:
   python main.py --input "Hello, this is Scripta." --output output/test.png
   python main.py --input doc.pdf --style a01 --page ruled --ink blue --output output/doc.pdf
   python main.py --input essay.docx --page parchment --ink black --output output/essay.pdf
+  python main.py --backend neural --style a01 --input "Hello world" --output output/neural.png
   python main.py --list-writers
   python main.py --list-pages
 """
@@ -70,6 +71,9 @@ def main():
                         help="Skip artifact simulation (faster, cleaner)")
     parser.add_argument("--seed", type=int, default=None,
                         help="Random seed for reproducible output")
+    parser.add_argument("--backend", type=str, default="font",
+                        choices=["font", "neural"],
+                        help="Rendering backend: 'font' (fast) or 'neural' (VATr++, best quality). Default: font")
     parser.add_argument("--list-writers", action="store_true",
                         help="List all available writer IDs and exit")
     parser.add_argument("--list-pages", action="store_true",
@@ -83,7 +87,65 @@ def main():
             print(f"  {name}")
         return
 
-    # Load dataset
+    # ------------------------------------------------------------------
+    # Neural backend: list writers from IAM style samples
+    # ------------------------------------------------------------------
+    if args.backend == "neural":
+        from scripta.neural_renderer import NeuralRenderer, STYLE_DIR
+        from scripta.neural_page_compositor import NeuralPageCompositor
+
+        if args.list_writers:
+            renderer = NeuralRenderer()
+            styles = renderer.available_styles()
+            print(f"Available neural writer styles ({len(styles)}):")
+            for s in styles:
+                print(f"  {s}")
+            return
+
+        if not args.input:
+            parser.print_help()
+            sys.exit(1)
+
+        input_path = Path(args.input)
+        paragraphs = from_file(input_path) if input_path.exists() else from_text(args.input)
+        total_words = sum(len(p) for p in paragraphs)
+        print(f"Input: {len(paragraphs)} paragraph(s), {total_words} word(s)")
+
+        print("Loading VATr++ neural renderer...")
+        renderer = NeuralRenderer()
+        renderer.load(verbose=True)
+
+        # Pick style: user choice or random from available
+        available = renderer.available_styles()
+        if not available:
+            print("ERROR: No style samples found. Run VATr-pp/prep_style_samples.py first.")
+            sys.exit(1)
+        style_id = args.style if args.style in available else available[0]
+        print(f"Using neural style: {style_id}")
+        renderer.set_style(style_id)
+
+        out_path = Path(args.output)
+        out_path.parent.mkdir(parents=True, exist_ok=True)
+
+        compositor = NeuralPageCompositor(
+            neural_renderer=renderer,
+            writer_id=style_id,
+            ink_color=args.ink,
+            page_style=args.page,
+            apply_artifacts=not args.no_artifacts,
+            seed=args.seed,
+        )
+
+        print(f"Rendering (neural) on '{args.page}' page in {args.ink} ink...")
+        pages = compositor.render(paragraphs)
+        print(f"Rendered {len(pages)} page(s)")
+        save_output(pages, out_path)
+        print(f"Saved: {out_path.resolve()}")
+        return
+
+    # ------------------------------------------------------------------
+    # Font backend (default)
+    # ------------------------------------------------------------------
     print("Loading handwriting dataset...")
     store = GlyphStore()
     store.load(verbose=True)
@@ -99,7 +161,6 @@ def main():
         parser.print_help()
         sys.exit(1)
 
-    # Parse input
     input_path = Path(args.input)
     if input_path.exists():
         print(f"Reading file: {input_path}")
@@ -110,7 +171,6 @@ def main():
     total_words = sum(len(p) for p in paragraphs)
     print(f"Input: {len(paragraphs)} paragraph(s), {total_words} word(s)")
 
-    # Render
     out_path = Path(args.output)
     out_path.parent.mkdir(parents=True, exist_ok=True)
 
