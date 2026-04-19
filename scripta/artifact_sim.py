@@ -18,7 +18,7 @@ from PIL import Image, ImageFilter, ImageChops, ImageDraw
 import config
 
 try:
-    from noise import pnoise2
+    from opensimplex import noise2 as pnoise2
     _HAS_NOISE = True
 except ImportError:
     _HAS_NOISE = False

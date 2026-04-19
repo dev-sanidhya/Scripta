@@ -21,7 +21,8 @@ from typing import Optional
 import numpy as np
 
 try:
-    from noise import pnoise1
+    from opensimplex import noise2
+    def pnoise1(x): return noise2(x, 0.0)
     _HAS_NOISE = True
 except ImportError:
     _HAS_NOISE = False
