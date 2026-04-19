@@ -156,13 +156,44 @@ Goal: Replace dataset-direct with VATr style-transfer model for unlimited text g
 
 ## Current Session Status
 
-**Session 1** — COMPLETE. All Phase 1 files written.
+**Session 2** — COMPLETE. Full pipeline working end-to-end.
 
-**Next session should**:
-1. Download IAM dataset: `kaggle datasets download -d tejasreddy/iam-handwriting-top50 -p data/iam --unzip`
-2. Install deps: `pip install -r requirements.txt`
-3. Run: `python main.py --input "The quick brown fox" --output output/test.png`
-4. Inspect output, then move to Phase 2 (variation engine tuning based on real output)
+**What works right now:**
+- `python main.py --input "any text" --output output/out.png` produces real handwriting
+- All 5 page styles work: ruled, college, grid, blank, parchment
+- Ink colors: blue, black, pencil
+- Variation engine active: fatigue, attention, rush, baseline drift
+- Artifact simulation: ink bleed, scan noise, paper texture, vignette, micro-warp
+- PDF and DOCX input supported
+
+**Environment setup (run once after cloning):**
+```bash
+pip install -r requirements.txt
+# Download IAM dataset (style references for Phase 5):
+python -c "
+import urllib.request, zipfile, os
+url = 'https://www.kaggle.com/api/v1/datasets/download/tejasreddy/iam-handwriting-top50'
+req = urllib.request.Request(url)
+req.add_header('Authorization', 'Bearer <KAGGLE_TOKEN>')
+os.makedirs('data/iam', exist_ok=True)
+urllib.request.urlretrieve(url, 'data/iam/dataset.zip')
+zipfile.ZipFile('data/iam/dataset.zip').extractall('data/iam')
+"
+# Download fonts:
+python -c "
+import urllib.request, os
+os.makedirs('fonts', exist_ok=True)
+urllib.request.urlretrieve('https://github.com/googlefonts/caveat/raw/main/fonts/ttf/Caveat-Regular.ttf', 'fonts/Caveat-Regular.ttf')
+urllib.request.urlretrieve('https://github.com/googlefonts/caveat/raw/main/fonts/ttf/Caveat-Bold.ttf', 'fonts/Caveat-Bold.ttf')
+"
+```
+
+**Next session should focus on (Phase 2 + 3):**
+1. Add more handwriting font styles (at least 3 more) to increase style variety
+2. Tune word_width_estimate so line wrapping matches actual rendered widths more accurately
+3. Align text baseline exactly ON the ruled lines (currently floats slightly above)
+4. Test with --input pointing to a real .docx or .pdf file
+5. Begin Phase 5 neural upgrade planning (VATr with IAM style images)
 
 ---
 
