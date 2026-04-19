@@ -154,32 +154,73 @@ Goal: Replace dataset-direct with VATr style-transfer model for unlimited text g
 
 ---
 
+## Architecture (with Neural Backend)
+
+```
+Input (PDF/DOCX/TXT)
+        ↓
+input_handler.py          — extracts clean text, preserves paragraph structure
+        ↓
+  ┌─────────────────────────────────────────────────────────┐
+  │  FONT backend (--backend font, default)                 │
+  │  glyph_store.py → renderer.py → variation_engine.py    │
+  │  → artifact_sim.py → page_compositor.py                 │
+  ├─────────────────────────────────────────────────────────┤
+  │  NEURAL backend (--backend neural, best quality)        │
+  │  neural_renderer.py (VATr++ on CUDA)                    │
+  │  → neural_page_compositor.py → artifact_sim.py          │
+  └─────────────────────────────────────────────────────────┘
+        ↓
+Output (PNG / PDF)
+```
+
+---
+
 ## Current Session Status
 
-**Session 2** — COMPLETE. Full pipeline working end-to-end.
+**Session 3** — COMPLETE. VATr++ neural backend fully integrated.
 
 **What works right now:**
-- `python main.py --input "any text" --output output/out.png` produces real handwriting
-- All 5 page styles work: ruled, college, grid, blank, parchment
-- Ink colors: blue, black, pencil
-- Variation engine active: fatigue, attention, rush, baseline drift
-- Artifact simulation: ink bleed, scan noise, paper texture, vignette, micro-warp
-- PDF and DOCX input supported
+- `python main.py --input "any text" --output output/out.png` (font backend)
+- `python main.py --backend neural --style a01 --input "any text" --output output/neural.png`
+  - Runs VATr++ on RTX 4050 CUDA, generates real neural handwriting in any IAM writer style
+  - 25 writer styles available: a01, a02, ... (IAM Top50 dataset)
+- All 5 page styles: ruled, college, grid, blank, parchment
+- Ink colors: blue, black, pencil — applied to neural output via alpha channel
+- WriterState baseline drift + artifact simulation applied on top of VATr++ output
 
-**Environment setup (run once after cloning):**
+**VATr++ setup (done once, must be redone after fresh clone):**
+```bash
+# 1. Clone VATr-pp into Scripta root
+git clone https://github.com/EDM-Research/VATr-pp.git VATr-pp
+
+# 2. Install VATr-pp deps
+cd VATr-pp && pip install -r requirements.txt && pip install msgpack wandb
+
+# 3. Download model weights from HuggingFace
+python -c "
+from huggingface_hub import hf_hub_download
+from safetensors.torch import load_file
+import torch, collections
+path = hf_hub_download('blowing-up-groundhogs/vatrpp', 'model.safetensors')
+st = load_file(path)
+od = collections.OrderedDict((k.replace('model.','',1), v) for k,v in st.items())
+torch.save({'model': od}, 'files/vatrpp.pth')
+print('Done')
+"
+
+# 4. Download resnet_18_pretrained.pth (check VATr-pp README for URL)
+
+# 5. Segment IAM line images into word crops for style samples
+cd ..
+python VATr-pp/prep_style_samples.py
+# (also copied to scripts/prep_style_samples.py)
+```
+
+**Font backend setup (done once):**
 ```bash
 pip install -r requirements.txt
-# Download IAM dataset (style references for Phase 5):
-python -c "
-import urllib.request, zipfile, os
-url = 'https://www.kaggle.com/api/v1/datasets/download/tejasreddy/iam-handwriting-top50'
-req = urllib.request.Request(url)
-req.add_header('Authorization', 'Bearer <KAGGLE_TOKEN>')
-os.makedirs('data/iam', exist_ok=True)
-urllib.request.urlretrieve(url, 'data/iam/dataset.zip')
-zipfile.ZipFile('data/iam/dataset.zip').extractall('data/iam')
-"
-# Download fonts:
+# Download fonts (Caveat):
 python -c "
 import urllib.request, os
 os.makedirs('fonts', exist_ok=True)
@@ -188,17 +229,24 @@ urllib.request.urlretrieve('https://github.com/googlefonts/caveat/raw/main/fonts
 "
 ```
 
-**Next session should focus on (Phase 2 + 3):**
-1. Add more handwriting font styles (at least 3 more) to increase style variety
-2. Tune word_width_estimate so line wrapping matches actual rendered widths more accurately
-3. Align text baseline exactly ON the ruled lines (currently floats slightly above)
-4. Test with --input pointing to a real .docx or .pdf file
-5. Begin Phase 5 neural upgrade planning (VATr with IAM style images)
+**Believability assessment:**
+- Font backend: ~65% believable (correct layout, good variation, but Caveat font recognizable)
+- Neural backend: ~85%+ believable (real learned handwriting strokes from IAM writers)
+- Gap to 90%+: larger text size (line_spacing too tight at 200 DPI), multi-line docs, more styles
+
+**Next session should focus on:**
+1. Increase line_spacing and glyph size so text fills the page more naturally at 200 DPI
+   (current ruled=40px is too tight; real ruled paper is ~68px at 200 DPI)
+2. Test neural backend with a multi-paragraph document (longer text, page overflow, indentation)
+3. Gradio UI (Phase 6) — style picker, page style, ink color, download button
+4. Deploy to HuggingFace Spaces
 
 ---
 
 ## Known Issues / Blockers
 
-- IAM dataset needs to be downloaded from Kaggle before glyph_store.py works.
-  Command: `kaggle datasets download -d tejasreddy/iam-handwriting-top50 -p data/iam --unzip`
-- Check exact folder structure after download, may need path adjustments in config.py.
+- VATr-pp is a nested git repo — not tracked in main Scripta repo. Must be cloned separately.
+- resnet_18_pretrained.pth must be present in VATr-pp/files/ (check VATr-pp README for source).
+- IAM style samples in VATr-pp/files/style_samples/ are excluded from git (large). Regenerate
+  with `python scripts/prep_style_samples.py` after cloning VATr-pp.
+- Font backend requires fonts/ directory with Caveat-Regular.ttf and Caveat-Bold.ttf.
