@@ -1,17 +1,18 @@
 """
-Glyph renderer — takes a word/char image from GlyphStore,
-applies WriterState perturbation params, and composites it onto a canvas.
+Renderer — composites glyph images onto a canvas with WriterState perturbations.
 
-Two modes:
-  - Word mode  : paste a full word image (preferred, looks best)
-  - Char mode  : compose word letter-by-letter (fallback for OOV words)
+Font-rendered glyphs come in as RGBA images. We apply:
+  - Recolor (white → transparent, black → ink color)
+  - Scale, rotate, slant (from GlyphParams)
+  - Alpha (opacity from fatigue)
+  - Paste onto canvas at position + baseline drift
 """
 
 import math
 from typing import Optional, Tuple
 
 import numpy as np
-from PIL import Image, ImageFilter, ImageChops
+from PIL import Image, ImageFilter
 
 import config
 from scripta.glyph_store import GlyphStore
@@ -19,39 +20,22 @@ from scripta.variation_engine import WriterState, GlyphParams
 
 
 def _recolor(img: Image.Image, ink_rgb: Tuple[int, int, int]) -> Image.Image:
-    """Replace dark pixels in a grayscale glyph with ink_rgb."""
+    """Replace glyph color with ink_rgb, preserving the source alpha channel."""
     img = img.convert("RGBA")
-    r, g, b, a = img.split()
+    _, _, _, a = img.split()
+    a_arr = np.array(a, dtype=np.uint8)
 
-    # Luminance mask: dark pixels → ink, light pixels → transparent
-    gray = np.array(img.convert("L"), dtype=np.float32)
-    mask = np.clip((255 - gray) / 255.0, 0, 1)
+    out = np.zeros((img.height, img.width, 4), dtype=np.uint8)
+    out[:, :, 0] = ink_rgb[0]
+    out[:, :, 1] = ink_rgb[1]
+    out[:, :, 2] = ink_rgb[2]
+    out[:, :, 3] = a_arr
 
-    r_ch = np.full_like(gray, ink_rgb[0])
-    g_ch = np.full_like(gray, ink_rgb[1])
-    b_ch = np.full_like(gray, ink_rgb[2])
-    a_ch = (mask * 255).astype(np.uint8)
-
-    out = Image.merge("RGBA", [
-        Image.fromarray(r_ch.astype(np.uint8)),
-        Image.fromarray(g_ch.astype(np.uint8)),
-        Image.fromarray(b_ch.astype(np.uint8)),
-        Image.fromarray(a_ch),
-    ])
-    return out
-
-
-def _scale_to_height(img: Image.Image, target_h: int) -> Image.Image:
-    """Scale image so its height equals target_h, preserving aspect ratio."""
-    w, h = img.size
-    if h == 0:
-        return img
-    new_w = max(1, int(w * target_h / h))
-    return img.resize((new_w, target_h), Image.LANCZOS)
+    return Image.fromarray(out, "RGBA")
 
 
 def _apply_params(img: Image.Image, params: GlyphParams) -> Image.Image:
-    """Apply scale, rotation, slant to the glyph image."""
+    """Apply scale, rotation, and slant shear to the glyph."""
     w, h = img.size
 
     # Scale
@@ -59,8 +43,8 @@ def _apply_params(img: Image.Image, params: GlyphParams) -> Image.Image:
     new_h = max(1, int(h * params.scale))
     img = img.resize((new_w, new_h), Image.LANCZOS)
 
-    # Rotation (small, around center)
-    if abs(params.rotate_deg) > 0.1:
+    # Rotation
+    if abs(params.rotate_deg) > 0.2:
         img = img.rotate(
             params.rotate_deg,
             resample=Image.BICUBIC,
@@ -68,14 +52,15 @@ def _apply_params(img: Image.Image, params: GlyphParams) -> Image.Image:
             fillcolor=(0, 0, 0, 0),
         )
 
-    # Slant via affine shear
-    if abs(params.slant) > 0.5:
-        shear = math.tan(math.radians(params.slant))
+    # Slant (horizontal shear)
+    if abs(params.slant) > 0.8:
+        shear = math.tan(math.radians(params.slant * 0.4))  # dampen slant for fonts
         w2, h2 = img.size
-        # Horizontal shear: x' = x + shear*y
-        data = (1, shear, -shear * h2 / 2, 0, 1, 0)
+        extra_w = int(abs(shear) * h2)
+        offset = -shear * h2 / 2 if shear > 0 else -shear * h2 / 2
+        data = (1, shear, offset, 0, 1, 0)
         img = img.transform(
-            (w2 + int(abs(shear) * h2), h2),
+            (w2 + extra_w, h2),
             Image.AFFINE,
             data,
             resample=Image.BICUBIC,
@@ -91,6 +76,15 @@ def _apply_alpha(img: Image.Image, alpha: float) -> Image.Image:
     r, g, b, a = img.split()
     a = a.point(lambda v: int(v * alpha))
     return Image.merge("RGBA", [r, g, b, a])
+
+
+def _add_stroke_variation(img: Image.Image, tremor: float) -> Image.Image:
+    """Subtle edge roughness — simulates pen nib/ball inconsistency."""
+    if tremor < 0.05:
+        return img
+    # Very slight blur on high tremor (pen wobble softens edges)
+    radius = tremor * 0.6
+    return img.filter(ImageFilter.GaussianBlur(radius=radius))
 
 
 class Renderer:
@@ -118,79 +112,39 @@ class Renderer:
         y: int,
     ) -> int:
         """
-        Render `word` onto `canvas` at (x, y).
-        Returns the x coordinate after the word (including spacing).
+        Render `word` onto `canvas` at baseline position (x, y).
+        Returns the x coordinate after the word (ready for next word).
         """
-        # Advance writer state for this word
         self.state.on_word(word)
         params = self.state.next_word_params(word)
 
-        # Try word-level image first
+        # Get word image from store (font-rendered)
         glyph = self.store.get_word_image(word, self.state.writer_id, self._rng)
-
         if glyph is None:
-            # Fallback: compose character by character
-            return self._render_word_from_chars(canvas, word, x, y, params)
-
-        # Normalize height
-        glyph = _scale_to_height(glyph, self.target_height)
+            return x + self.word_width_estimate(word)
 
         # Recolor to ink
         glyph = _recolor(glyph, self.ink_rgb)
 
-        # Apply variation
+        # Apply variation transforms
         glyph = _apply_params(glyph, params)
+        glyph = _add_stroke_variation(glyph, params.tremor)
         glyph = _apply_alpha(glyph, params.alpha)
 
-        # Compute paste position with offsets + baseline drift
+        # Position: x is left edge, y is baseline — glyph hangs above
         paste_x = int(x + params.offset_x)
         paste_y = int(y - glyph.height + params.offset_y + params.baseline_y)
-        paste_y = max(0, paste_y)
 
-        # Composite onto canvas
+        # Keep within canvas bounds
+        paste_x = max(0, min(paste_x, canvas.width - 1))
+        paste_y = max(0, min(paste_y, canvas.height - glyph.height))
+
         canvas.paste(glyph, (paste_x, paste_y), glyph)
 
         advance = paste_x + glyph.width + int(self.word_spacing * params.spacing_factor)
         return advance
 
-    def _render_word_from_chars(
-        self,
-        canvas: Image.Image,
-        word: str,
-        x: int,
-        y: int,
-        word_params: GlyphParams,
-    ) -> int:
-        """Compose word glyph-by-glyph when word image is unavailable."""
-        cursor_x = x
-
-        for char in word:
-            if char.isspace():
-                cursor_x += self.word_spacing
-                continue
-
-            char_params = self.state.next_glyph(char)
-            glyph = self.store.get_char_image(char, self.state.writer_id, self._rng)
-
-            if glyph is None:
-                # Character truly unavailable — skip with spacing
-                cursor_x += int(self.target_height * 0.45)
-                continue
-
-            glyph = _scale_to_height(glyph, self.target_height)
-            glyph = _recolor(glyph, self.ink_rgb)
-            glyph = _apply_params(glyph, char_params)
-            glyph = _apply_alpha(glyph, char_params.alpha)
-
-            paste_x = int(cursor_x + char_params.offset_x)
-            paste_y = int(y - glyph.height + char_params.offset_y + char_params.baseline_y)
-            paste_y = max(0, paste_y)
-
-            canvas.paste(glyph, (paste_x, paste_y), glyph)
-            cursor_x = paste_x + glyph.width + self.char_spacing
-
-        return cursor_x + int(self.word_spacing * word_params.spacing_factor)
-
     def word_width_estimate(self, word: str) -> int:
-        """Rough width estimate for line-wrap planning (no rendering)."""
-        return int(len(word) * self.target_height * 0.55 + self.word_spacing)
+        """Fast width estimate for line-wrap pre-computation."""
+        # Font-based: ~0.55× height per character is a good estimate for Caveat
+        return int(len(word) * self.target_height * 0.52 + self.word_spacing)

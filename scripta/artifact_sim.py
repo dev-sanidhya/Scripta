@@ -78,7 +78,7 @@ def _synthesize_paper_grain(size: Tuple[int, int]) -> Image.Image:
         scale = 0.008
         for y in range(h):
             for x in range(w):
-                arr[y, x] = pnoise2(x * scale, y * scale, octaves=4)
+                arr[y, x] = pnoise2(x * scale, y * scale)
         arr = (arr - arr.min()) / (arr.max() - arr.min() + 1e-6)
     else:
         # Simple fallback: gaussian-smoothed noise
@@ -134,44 +134,27 @@ def apply_vignette(img: Image.Image, strength: float = 0.06) -> Image.Image:
 
 def apply_micro_warp(img: Image.Image, amplitude: float = 1.2) -> Image.Image:
     """
-    Subtle pixel-level warp using a displacement map.
+    Subtle pixel-level warp using a scipy-based displacement map.
     Eliminates pixel-perfect regularity — the last tell of digital rendering.
+    Uses gaussian-filtered noise (fast, no pixel-level Python loops).
     """
+    from scipy.ndimage import gaussian_filter
+    import cv2
+
     w, h = img.size
     arr = np.array(img)
 
-    # Generate smooth displacement fields
-    if _HAS_NOISE:
-        scale = 0.03
-        dx = np.array([[pnoise2(x * scale, y * scale, octaves=2)
-                         for x in range(w)] for y in range(h)], dtype=np.float32)
-        dy = np.array([[pnoise2(x * scale + 100, y * scale + 100, octaves=2)
-                         for x in range(w)] for y in range(h)], dtype=np.float32)
-    else:
-        from scipy.ndimage import gaussian_filter
-        dx = gaussian_filter(np.random.randn(h, w).astype(np.float32), sigma=8)
-        dy = gaussian_filter(np.random.randn(h, w).astype(np.float32), sigma=8)
+    # Smooth random displacement fields — gaussian filter gives organic curves
+    rng = np.random.default_rng()
+    dx = gaussian_filter(rng.standard_normal((h, w)).astype(np.float32), sigma=18) * amplitude * 2
+    dy = gaussian_filter(rng.standard_normal((h, w)).astype(np.float32), sigma=18) * amplitude * 2
 
-    dx = dx * amplitude
-    dy = dy * amplitude
-
-    # Build remapping coordinates
     grid_y, grid_x = np.mgrid[0:h, 0:w]
     map_x = np.clip(grid_x + dx, 0, w - 1).astype(np.float32)
     map_y = np.clip(grid_y + dy, 0, h - 1).astype(np.float32)
 
-    # Remap using OpenCV for speed
-    try:
-        import cv2
-        if arr.ndim == 3 and arr.shape[2] == 4:
-            warped = cv2.remap(arr, map_x, map_y, cv2.INTER_LINEAR,
-                               borderMode=cv2.BORDER_REFLECT)
-        else:
-            warped = cv2.remap(arr, map_x, map_y, cv2.INTER_LINEAR,
-                               borderMode=cv2.BORDER_REFLECT)
-        return Image.fromarray(warped, mode=img.mode)
-    except ImportError:
-        return img  # Skip warp if cv2 not available
+    warped = cv2.remap(arr, map_x, map_y, cv2.INTER_LINEAR, borderMode=cv2.BORDER_REFLECT)
+    return Image.fromarray(warped, mode=img.mode)
 
 
 def apply_all(

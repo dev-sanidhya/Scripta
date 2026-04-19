@@ -130,7 +130,7 @@ def main():
     print(f"Rendered {len(pages)} page(s)")
 
     save_output(pages, out_path)
-    print(f"Saved → {out_path.resolve()}")
+    print(f"Saved: {out_path.resolve()}")
 
 
 if __name__ == "__main__":

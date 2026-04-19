@@ -90,12 +90,12 @@ class WriterState:
     def _sample_personality(self) -> dict:
         """Each writer has fixed traits that don't change mid-document."""
         return {
-            "size_base": self._py_rng.uniform(0.88, 1.12),
-            "slant_bias": self._py_rng.uniform(-5.0, 5.0),    # natural lean
-            "tremor_sensitivity": self._py_rng.uniform(0.4, 1.0),
-            "rush_sensitivity": self._py_rng.uniform(0.5, 1.0),
-            "fatigue_sensitivity": self._py_rng.uniform(0.6, 1.2),
-            "baseline_amplitude": self._py_rng.uniform(1.5, 4.5),
+            "size_base": self._py_rng.uniform(0.94, 1.06),
+            "slant_bias": self._py_rng.uniform(-3.0, 3.0),
+            "tremor_sensitivity": self._py_rng.uniform(0.3, 0.7),
+            "rush_sensitivity": self._py_rng.uniform(0.4, 0.8),
+            "fatigue_sensitivity": self._py_rng.uniform(0.5, 0.9),
+            "baseline_amplitude": self._py_rng.uniform(1.0, 3.0),
         }
 
     # ------------------------------------------------------------------
@@ -147,18 +147,18 @@ class WriterState:
         self._noise_offset += 0.11
 
         # Scale: fatigue shrinks, attention boosts
-        scale_noise = self._rng.normal(0, 0.025)
+        scale_noise = self._rng.normal(0, 0.015)
         scale = (
             pers["size_base"] *
-            (1.0 - f * 0.12) *
-            (1.0 + (a - 0.5) * 0.06) +
+            (1.0 - f * 0.08) *
+            (1.0 + (a - 0.5) * 0.03) +
             scale_noise
         )
-        scale = float(np.clip(scale, 0.70, 1.30))
+        scale = float(np.clip(scale, 0.82, 1.18))
 
         # Rotation jitter: more at high fatigue, less when attentive
-        rot_std = 0.8 + f * 2.5 - a * 0.6
-        rotate_deg = float(self._rng.normal(0, max(0.3, rot_std)))
+        rot_std = 0.5 + f * 1.5 - a * 0.3
+        rotate_deg = float(self._rng.normal(0, max(0.2, rot_std)))
 
         # Offset jitter
         offset_x = float(self._rng.normal(0, 1.0 + f * 1.5))
