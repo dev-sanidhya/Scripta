@@ -25,38 +25,40 @@ from scripta import artifact_sim
 
 
 PAGE_STYLES = {
+    # line_spacing values are in px at 200 DPI.
+    # Real wide-ruled paper: 8.7mm ≈ 69px. College-ruled: 7.1mm ≈ 56px.
     "ruled": {
         "bg": (252, 251, 245),
         "line_color": (176, 196, 222),
-        "line_spacing": 40,
+        "line_spacing": 69,
         "margin_line": True,
         "grid": False,
     },
     "college": {
         "bg": (252, 251, 245),
         "line_color": (176, 196, 222),
-        "line_spacing": 32,
+        "line_spacing": 56,
         "margin_line": True,
         "grid": False,
     },
     "grid": {
         "bg": (250, 250, 255),
         "line_color": (200, 210, 230),
-        "line_spacing": 28,
+        "line_spacing": 48,
         "margin_line": False,
         "grid": True,
     },
     "blank": {
         "bg": (253, 252, 248),
         "line_color": None,
-        "line_spacing": 40,
+        "line_spacing": 69,
         "margin_line": False,
         "grid": False,
     },
     "parchment": {
         "bg": (240, 225, 185),
         "line_color": None,
-        "line_spacing": 42,
+        "line_spacing": 69,
         "margin_line": False,
         "grid": False,
     },
