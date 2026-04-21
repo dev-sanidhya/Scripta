@@ -42,52 +42,52 @@ def _load_neural_renderer():
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Writer name maps  —  friendly names shown in UI, IDs passed to backend
+# Writer style descriptions  —  what the handwriting actually looks like
 # ──────────────────────────────────────────────────────────────────────────────
 
-_FONT_WRITER_NAMES = {
-    "w01": "Maya",
-    "w02": "Ethan",
-    "w03": "Chloe",
-    "w04": "Marcus",
-    "w05": "Priya",
-    "w06": "Jake",
-    "w07": "Zoe",
-    "w08": "Kai",
-    "w09": "Nora",
-    "w10": "Leo",
+_FONT_STYLE_DESC = {
+    "w01": "Casual • Loose",
+    "w02": "Neat • Compact",
+    "w03": "Flowing • Cursive",
+    "w04": "Bold • Chunky",
+    "w05": "Sharp • Angular",
+    "w06": "Relaxed • Bouncy",
+    "w07": "Tight • Careful",
+    "w08": "Free • Expressive",
+    "w09": "Straight • Formal",
+    "w10": "Slanted • Dynamic",
 }
 
-_NEURAL_WRITER_NAMES = {
-    "a01": "Sophie",
-    "a02": "Liam",
-    "a03": "Aria",
-    "a04": "Owen",
-    "a05": "Isla",
-    "a06": "Noah",
-    "a07": "Zara",
-    "a08": "Felix",
-    "a09": "Luna",
-    "a10": "Rohan",
-    "a11": "Mia",
-    "a12": "Callum",
-    "a13": "Jade",
-    "a14": "Ravi",
-    "a15": "Clara",
-    "a16": "Dylan",
-    "a17": "Niamh",
-    "a18": "Sebastian",
-    "a19": "Freya",
-    "a20": "Mateo",
-    "a21": "Vera",
-    "a22": "Elliot",
-    "a23": "Amara",
-    "a24": "Hugo",
-    "a25": "Sienna",
+_NEURAL_STYLE_DESC = {
+    "a01": "Neat • Precise",
+    "a02": "Casual • Flowing",
+    "a03": "Cursive • Connected",
+    "a04": "Loose • Relaxed",
+    "a05": "Tight • Compact",
+    "a06": "Bold • Confident",
+    "a07": "Delicate • Fine",
+    "a08": "Round • Soft",
+    "a09": "Sharp • Angular",
+    "a10": "Free • Expressive",
+    "a11": "Neat • Organized",
+    "a12": "Slanted • Dynamic",
+    "a13": "Formal • Careful",
+    "a14": "Loose • Natural",
+    "a15": "Flowing • Elegant",
+    "a16": "Bouncy • Playful",
+    "a17": "Straight • Direct",
+    "a18": "Connected • Cursive",
+    "a19": "Fine • Delicate",
+    "a20": "Bold • Strong",
+    "a21": "Casual • Relaxed",
+    "a22": "Tight • Precise",
+    "a23": "Round • Soft",
+    "a24": "Angular • Sharp",
+    "a25": "Flowing • Smooth",
 }
 
-# Combined ID → display name (for status messages)
-_ALL_WRITER_NAMES = {**_FONT_WRITER_NAMES, **_NEURAL_WRITER_NAMES}
+# Combined ID → style description (for status messages)
+_ALL_STYLE_DESC = {**_FONT_STYLE_DESC, **_NEURAL_STYLE_DESC}
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -117,13 +117,13 @@ NEURAL_AVAILABLE = bool(NEURAL_WRITERS)
 
 
 def _font_writer_choices():
-    """(display name, backend id) tuples for font writers."""
-    return [(_FONT_WRITER_NAMES.get(w, w), w) for w in FONT_WRITERS]
+    """(display: id + style desc, backend id) tuples for font writers."""
+    return [(f"{w} • {_FONT_STYLE_DESC.get(w, '')}", w) for w in FONT_WRITERS]
 
 
 def _neural_writer_choices():
-    """(display name, backend id) tuples for neural writers."""
-    return [(_NEURAL_WRITER_NAMES.get(w, w), w) for w in NEURAL_WRITERS]
+    """(display: id + style desc, backend id) tuples for neural writers."""
+    return [(f"{w} • {_NEURAL_STYLE_DESC.get(w, '')}", w) for w in NEURAL_WRITERS]
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -239,12 +239,12 @@ def generate(
 
         progress(1.00, desc="Done!")
 
-        writer_name  = _ALL_WRITER_NAMES.get(style_id, style_id)
+        style_desc   = _ALL_STYLE_DESC.get(style_id, "")
         quality_name = "Realistic" if use_realistic else "Instant"
         n            = len(pages)
         status = (
             f"✅ **{n} page{'s' if n > 1 else ''} generated** in {elapsed:.1f}s\n\n"
-            f"{writer_name}'s handwriting · {quality_name} · "
+            f"{style_id} • {style_desc} · {quality_name} · "
             f"{ink_color.capitalize()} ink · {total_words} words"
         )
 
