@@ -121,8 +121,8 @@ Output (PNG / multi-page PDF)
 | VATr++ neural rendering | ✅ | On RTX 4050 CUDA, 25 IAM writer styles |
 | Word wrap in neural mode | ✅ | Lines split correctly before VATr++ generation |
 | Correct line spacing | ✅ | ruled=69px, college=56px (real paper dimensions at 200 DPI) |
-| Gradio UI | ❌ | Next priority |
-| HuggingFace deployment | ❌ | After Gradio UI |
+| Gradio UI | ✅ | app.py — human writer names, no tech jargon, Gradio 6 |
+| HuggingFace deployment | ❌ | After polish |
 
 ---
 
@@ -277,24 +277,34 @@ python scripts/prep_style_samples.py
 
 ---
 
-## What To Build Next (Session 4)
+## What To Build Next (Session 5)
 
-**Priority 1: Gradio UI**
-- Style picker (dropdown: a01–a25 for neural, w01–w10 for font)
-- Page style selector (ruled / college / grid / blank / parchment)
-- Ink color picker (blue / black / pencil)
-- Text input box + file upload (.txt, .pdf, .docx)
-- Output: display image + download button
-- Backend toggle (font vs neural)
+**Priority 1: UI Polish**
+- Live preview thumbnail of each writer style (pre-rendered sample strip)
+- Page count estimate before generating ("~2 pages")
+- Faster font-backend cold start (GlyphStore loads on first generate, not import)
+- Mobile layout check
 
 **Priority 2: HuggingFace Spaces deployment**
-- Note: GPU Spaces on HF are paid. For free tier, font backend only (CPU).
-- Neural backend would need a paid GPU Space or Colab link.
+- Free tier → font backend only (Instant mode), no GPU needed
+- Paid GPU Space or Colab link for Realistic mode
+- `requirements.txt` is already correct; add `app.py` as HF entrypoint
 
 **Priority 3 (nice to have):**
-- User uploads own handwriting image → VATr++ generates in that style
+- User uploads own handwriting image → generates in that style
 - More page styles (legal pad, dot grid)
-- Multi-page PDF preview in Gradio
+- Multi-page PDF preview in Gradio (show page thumbnails strip)
+
+---
+
+## Session 4 — What Was Done
+
+- Built `app.py`: full Gradio 6 UI wired to both backends
+- Human names for all 35 writers (Maya, Ethan, Chloe… Sophie, Liam, Aria…)
+- Zero tech jargon in UI — "Instant / Realistic" quality modes
+- Backend/theme/css moved to `launch()` per Gradio 6 API
+- Lazy-load singletons: font store + neural renderer only load when needed
+- End-to-end tested: status reads "Chloe's handwriting · Instant · Blue ink"
 
 ---
 
