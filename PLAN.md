@@ -277,18 +277,17 @@ python scripts/prep_style_samples.py
 
 ---
 
-## What To Build Next (Session 5)
+## What To Build Next (Session 6)
 
-**Priority 1: UI Polish**
-- Live preview thumbnail of each writer style (pre-rendered sample strip)
-- Page count estimate before generating ("~2 pages")
-- Faster font-backend cold start (GlyphStore loads on first generate, not import)
-- Mobile layout check
-
-**Priority 2: HuggingFace Spaces deployment**
+**Priority 1: HuggingFace Spaces deployment**
 - Free tier → font backend only (Instant mode), no GPU needed
 - Paid GPU Space or Colab link for Realistic mode
 - `requirements.txt` is already correct; add `app.py` as HF entrypoint
+
+**Priority 2: UI Polish**
+- Live preview thumbnail of each writer style (pre-rendered sample strip)
+- Page count estimate before generating ("~2 pages")
+- Mobile layout check
 
 **Priority 3 (nice to have):**
 - User uploads own handwriting image → generates in that style
@@ -296,6 +295,17 @@ python scripts/prep_style_samples.py
 - Multi-page PDF preview in Gradio (show page thumbnails strip)
 
 ---
+
+## Session 5 — What Was Done
+
+- Rewrote `app.py` to v5 "Clean Light" design (scrapped split-panel dark/light)
+- New design: deep violet gradient hero header + light white cards below
+- Switched from `gr.themes.Soft` → `gr.themes.Base` (no auto dark-mode override)
+- Added `color-scheme: light` + `@media (prefers-color-scheme: dark)` override CSS
+- Added force-white CSS overrides for `.block`, `textarea`, `input` to defeat OS dark mode
+- Fixed multi-server port conflict (old server was blocking port 7860 on restarts)
+- Writer style labels use descriptors: `"Casual · Loose [w01]"` etc.
+- All changes committed and pushed
 
 ## Session 4 — What Was Done
 
