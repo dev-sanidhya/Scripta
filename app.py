@@ -199,26 +199,32 @@ def generate(
 # Theme  — Soft base, light and clean, minimal overrides needed
 # ──────────────────────────────────────────────────────────────────────────────
 
-_theme = gr.themes.Soft(
+_theme = gr.themes.Base(
     primary_hue="violet",
     neutral_hue="slate",
     font=[gr.themes.GoogleFont("Inter"), "ui-sans-serif", "sans-serif"],
     font_mono=[gr.themes.GoogleFont("JetBrains Mono"), "monospace"],
 ).set(
+    # Page
     body_background_fill="#f0f2f8",
     body_text_color="#1e293b",
-    body_text_size="*text_sm",
+    body_text_size="14px",
     body_text_color_subdued="#64748b",
+    background_fill_primary="#ffffff",
+    background_fill_secondary="#f8faff",
 
+    # Blocks / cards
     block_background_fill="#ffffff",
     block_border_color="#e8ecf4",
     block_border_width="1px",
     block_shadow="0 1px 3px rgba(0,0,0,0.04), 0 4px 16px rgba(0,0,0,0.03)",
     block_radius="16px",
     block_label_text_color="#64748b",
-    block_label_text_size="*text_xs",
+    block_label_text_size="11px",
     block_info_text_color="#94a3b8",
+    block_info_text_size="11px",
 
+    # Inputs
     input_background_fill="#f8faff",
     input_background_fill_focus="#ffffff",
     input_border_color="#dde3f0",
@@ -228,20 +234,31 @@ _theme = gr.themes.Soft(
     input_shadow_focus="0 0 0 3px rgba(124,58,237,0.10)",
     input_radius="10px",
     input_placeholder_color="#b0bbd4",
+    input_text_size="14px",
 
-    button_primary_background_fill="linear-gradient(135deg, #7c3aed 0%, #6d28d9 100%)",
-    button_primary_background_fill_hover="linear-gradient(135deg, #6d28d9 0%, #5b21b6 100%)",
+    # Buttons
+    button_primary_background_fill="#7c3aed",
+    button_primary_background_fill_hover="#6d28d9",
     button_primary_text_color="#ffffff",
     button_primary_border_color="transparent",
     button_large_radius="12px",
     button_large_text_weight="600",
     button_large_padding="14px 24px",
+    button_small_radius="8px",
 
+    # Accents / borders
     color_accent="#7c3aed",
     color_accent_soft="rgba(124,58,237,0.08)",
+    border_color_primary="#e8ecf4",
     border_color_accent="#7c3aed",
     shadow_drop="0 1px 4px rgba(0,0,0,0.06), 0 6px 20px rgba(0,0,0,0.04)",
     shadow_spread="0px",
+
+    # Checkbox / radio
+    checkbox_background_color="#ffffff",
+    checkbox_background_color_selected="#7c3aed",
+    checkbox_border_color="#dde3f0",
+    checkbox_border_color_selected="#7c3aed",
 )
 
 
@@ -250,6 +267,14 @@ _theme = gr.themes.Soft(
 # ──────────────────────────────────────────────────────────────────────────────
 
 CSS = """
+/* ── Force light mode regardless of OS preference ──────────────────────────── */
+:root { color-scheme: light !important; }
+html, body {
+    color-scheme: light !important;
+    background: #f0f2f8 !important;
+    color: #1e293b !important;
+}
+
 /* ── Reset & page ─────────────────────────────────────────────────────────── */
 footer { display: none !important; }
 .gradio-container {
@@ -257,6 +282,41 @@ footer { display: none !important; }
     margin: 0 auto !important;
     padding: 0 !important;
     background: #f0f2f8 !important;
+}
+/* Override any dark-mode media query Gradio may inject */
+@media (prefers-color-scheme: dark) {
+    :root { color-scheme: light !important; }
+    html, body { background: #f0f2f8 !important; color: #1e293b !important; }
+    .gradio-container { background: #f0f2f8 !important; }
+}
+
+/* Force white cards and light inputs regardless of dark mode */
+.gradio-container .block,
+.gradio-container .form,
+.gradio-container fieldset,
+.gradio-container .gap {
+    background-color: #ffffff !important;
+    border-color: #e8ecf4 !important;
+}
+.gradio-container textarea,
+.gradio-container input[type="text"],
+.gradio-container input[type="number"] {
+    background-color: #f8faff !important;
+    color: #1e293b !important;
+    border-color: #dde3f0 !important;
+}
+.gradio-container select {
+    background-color: #f8faff !important;
+    color: #1e293b !important;
+}
+.gradio-container label span,
+.gradio-container .label-wrap span,
+.gradio-container p,
+.gradio-container .prose {
+    color: #1e293b !important;
+}
+.gradio-container .block-info {
+    color: #64748b !important;
 }
 
 /* ── Hero header ───────────────────────────────────────────────────────────── */
